@@ -1,20 +1,20 @@
 <?php
 
-$GLOBALS["LIB_LOCATION"] = dirname(__FILE__);
-
 /**
  * MercadoPago cURL RestClient
  */
 class MPRestClient {
 
-    const API_BASE_URL = "https://api.mercadolibre.com";
+    const API_BASE_URL = "https://api.mercadopago.com";
 
     private static function get_connect($uri, $method, $content_type) {
+        if (!extension_loaded ("curl")) {
+            throw new Exception("cURL extension not found. You need to enable cURL in your php.ini or another configuration you have.");
+        }
+
         $connect = curl_init(self::API_BASE_URL . $uri);
 
         curl_setopt($connect, CURLOPT_USERAGENT, "MercadoPago PHP SDK v" . MP::version);
-        curl_setopt($connect, CURLOPT_CAINFO, $GLOBALS["LIB_LOCATION"] . "/cacert.pem");
-        curl_setopt($connect, CURLOPT_SSLVERSION, 3);
         curl_setopt($connect, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($connect, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($connect, CURLOPT_HTTPHEADER, array("Accept: application/json", "Content-Type: " . $content_type));
@@ -50,6 +50,10 @@ class MPRestClient {
         $api_result = curl_exec($connect);
         $api_http_code = curl_getinfo($connect, CURLINFO_HTTP_CODE);
 
+        if ($api_result === FALSE) {
+            throw new Exception (curl_error ($connect));
+        }
+
         $response = array(
             "status" => $api_http_code,
             "response" => json_decode($api_result, true)
@@ -76,5 +80,9 @@ class MPRestClient {
         return self::exec("PUT", $uri, $data, $content_type);
     }
 
+    public static function delete($uri, $content_type = "application/json") {
+        return self::exec("DELETE", $uri, $null, $content_type);
+    }
 }
+
 ?>

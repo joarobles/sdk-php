@@ -7,18 +7,32 @@
  * @author hcasatti
  *
  */
+
 class MP {
 
-    const version = "0.2.1";
+    const version = "0.3.2";
 
     private $client_id;
     private $client_secret;
+    private $ll_access_token;
     private $access_data;
     private $sandbox = FALSE;
 
-    function __construct($client_id, $client_secret) {
-        $this->client_id = $client_id;
-        $this->client_secret = $client_secret;
+    function __construct() {
+        $i = func_num_args(); 
+
+        if ($i > 2 || $i < 1) {
+            throw new Exception("Invalid arguments. Use CLIENT_ID and CLIENT SECRET, or ACCESS_TOKEN");
+        }
+
+        if ($i == 1) {
+            $this->ll_access_token = func_get_arg(0);
+        }
+
+        if ($i == 2) {
+            $this->client_id = func_get_arg(0);
+            $this->client_secret = func_get_arg(1);
+        }
     }
 
     public function sandbox_mode($enable = NULL) {
@@ -33,13 +47,21 @@ class MP {
      * Get Access Token for API use
      */
     public function get_access_token() {
+        if (isset ($this->ll_access_token) && !is_null($this->ll_access_token)) {
+            return $this->ll_access_token;
+        }
+
         $app_client_values = $this->build_query(array(
             'client_id' => $this->client_id,
             'client_secret' => $this->client_secret,
             'grant_type' => 'client_credentials'
-                ));
+        ));
 
         $access_data = MPRestClient::post("/oauth/token", $app_client_values, "application/x-www-form-urlencoded");
+
+        if ($access_data["status"] != 200) {
+            throw new Exception ($access_data['response']['message'], $access_data['status']);
+        }
 
         $this->access_data = $access_data['response'];
 
@@ -203,6 +225,108 @@ class MP {
 
         $preapproval_payment_result = MPRestClient::get("/preapproval/{$id}?access_token=" . $access_token);
         return $preapproval_payment_result;
+    }
+
+    /**
+     * Update a preapproval payment
+     * @param string $preapproval_payment, $id
+     * @return array(json)
+     */ 
+    
+    public function update_preapproval_payment($id, $preapproval_payment) {
+        $access_token = $this->get_access_token();
+
+        $preapproval_payment_result = MPRestClient::put("/preapproval/" . $id . "?access_token=" . $access_token, $preapproval_payment);
+        return $preapproval_payment_result;
+    }
+
+    /* Generic resource call methods */
+
+    /**
+    * Generic resource get
+    * @param uri
+    * @param params
+    * @param authenticate = true
+    */
+    public function get($uri, $params = null, $authenticate = true) {
+        $params = is_array ($params) ? $params : array();
+
+        if ($authenticate !== false) {
+            $access_token = $this->get_access_token();
+
+            $params["access_token"] = $access_token;
+        }
+
+        if (count($params) > 0) {
+            $uri .= (strpos($uri, "?") === false) ? "?" : "&";
+            $uri .= $this->build_query($params);            
+        }
+
+        $result = MPRestClient::get($uri);
+        return $result;
+    }
+
+    /**
+    * Generic resource post
+    * @param uri
+    * @param data
+    * @param params
+    */
+    public function post($uri, $data, $params = null) {
+        $params = is_array ($params) ? $params : array();
+
+        $access_token = $this->get_access_token();
+        $params["access_token"] = $access_token;
+
+        if (count($params) > 0) {
+            $uri .= (strpos($uri, "?") === false) ? "?" : "&";
+            $uri .= $this->build_query($params);            
+        }
+
+        $result = MPRestClient::post($uri, $data);
+        return $result;
+    }
+
+    /**
+    * Generic resource put
+    * @param uri
+    * @param data
+    * @param params
+    */
+    public function put($uri, $data, $params = null) {
+        $params = is_array ($params) ? $params : array();
+
+        $access_token = $this->get_access_token();
+        $params["access_token"] = $access_token;
+
+        if (count($params) > 0) {
+            $uri .= (strpos($uri, "?") === false) ? "?" : "&";
+            $uri .= $this->build_query($params);            
+        }
+
+        $result = MPRestClient::put($uri, $data);
+        return $result;
+    }
+
+    /**
+    * Generic resource delete
+    * @param uri
+    * @param data
+    * @param params
+    */
+    public function delete($uri, $params = null) {
+        $params = is_array ($params) ? $params : array();
+
+        $access_token = $this->get_access_token();
+        $params["access_token"] = $access_token;
+
+        if (count($params) > 0) {
+            $uri .= (strpos($uri, "?") === false) ? "?" : "&";
+            $uri .= $this->build_query($params);
+        }
+
+        $result = MPRestClient::delete($uri);
+        return $result;
     }
 
     /* **************************************************************************************** */
